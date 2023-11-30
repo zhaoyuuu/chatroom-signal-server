@@ -45,6 +45,11 @@ io.on('connection', (socket) => {
     hanldeUserDisconnect(socket, data);
   })
 
+  // 用户交换 ice candidate
+  socket.on('icecandidate', data => {
+    socket.to(data.roomId).emit('icecandidate', data)
+  })
+
   // 用户发送offer
   socket.on('offer', data => {
     socket.to(data.roomId).emit('offer', data);
