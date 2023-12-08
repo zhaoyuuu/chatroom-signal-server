@@ -61,24 +61,37 @@ io.on('connection', (socket) => {
   })
 
   // 用户发送消息
-  socket.on('message', data => {
+  socket.on('message', async (data) => {
     const { roomId, msg } = data;
-    const room = roomList.filter(r => r.roomId === roomId)[0];
-    room.completeChat = room.completeChat ? room.completeChat + msg : msg;
-    io.in(roomId).emit('message', room.completeChat);
+    await syncEmitToRoom(roomId, 'message', msg)
+    // 通知该用户消息发送成功
+    socket.emit('messageArrive', msg)
   })
 
+  // 同步化socket.emit()
+  function syncEmitToRoom(roomId, eventName, data) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        socket.to(roomId).emit(eventName, data, (response) => {
+          // todo 模拟网络延迟
+          resolve(response)
+        })
+      }, 2000);
+    })
+  }
 })
+
+
 
 function handleUserJoin(socket, data) {
   const { userId, roomId } = data
   const filterRoom = roomList.filter(room => room.roomId === roomId)[0];
   let room = null;
 
-  if(filterRoom) {
+  if (filterRoom) {
     room = filterRoom;
     // 判断用户已经在房间内
-    if(room.userIds.includes(userId)) {
+    if (room.userIds.includes(userId)) {
       socket.emit('error', '你已在房间内');
       return;
     }
@@ -91,7 +104,7 @@ function handleUserJoin(socket, data) {
   }
 
   // 每个房间不超过预设的人数
-  if(room.userIds.length >= MAX_USER_COUNT) {
+  if (room.userIds.length >= MAX_USER_COUNT) {
     console.log(room.userIds);
     socket.emit('error', '房间人数已满，请稍后再试');
     return;
@@ -119,9 +132,9 @@ function hanldeUserDisconnect(socket, data) {
   const room = roomList.filter(r => r.roomId === roomId)[0];
   // 把该用户的信息从房间中删除
   const idx = room?.userIds?.indexOf(userId);
-  if(idx !== undefined) {
+  if (idx !== undefined) {
     room.userIds.splice(idx, 1);
-  
+
     // 用户离开房间
     socket.leave(roomId);
     // 通知房间内的其他用户
